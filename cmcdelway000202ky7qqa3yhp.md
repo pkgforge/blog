@@ -1,8 +1,8 @@
 ---
-title: "Cross-Compiling 10,000+ Rust CLI Crates Statically at Scale"
+title: "Cross-Compiling 10,000+ Rust CLI Crates Statically"
 datePublished: Thu Jun 26 2025 13:13:14 GMT+0000 (Coordinated Universal Time)
 cuid: cmcdelway000202ky7qqa3yhp
-slug: cross-compiling-10000-rust-cli-crates-statically-at-scale
+slug: cross-compiling-10000-rust-cli-crates-statically
 cover: https://cdn.hashnode.com/res/hashnode/image/upload/v1750923596496/4a43954c-6105-4b54-8cc7-5eb857a23c11.png
 tags: linux, automation, cli, rust, scale, programming-languages, cargo, package-manager, rust-lang, experimentation, rust-programming
 
