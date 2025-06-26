@@ -252,11 +252,11 @@ For instance, if we try to list all executables (not crates) for `x86_64-Linux`,
 
 ![](https://cdn.hashnode.com/res/hashnode/image/upload/v1750942440242/8809f2bd-ea27-410c-8b4f-3edbbae332a2.gif align="center")
 
-What happened? Where did they go missing? Well it turns, out some crates actually build successfully for non-standard targets like `loongarch64-Linux` & `riscv64-Linux` but fail for the regular aarch64/x86\_64
+What happened? Where did they go missing? Well it turns out, some crates actually build successfully for non-standard targets like `loongarch64-Linux` & `riscv64-Linux` but fail for the regular aarch64/x86\_64
 
 ![](https://cdn.hashnode.com/res/hashnode/image/upload/v1750943280327/83353900-4b76-464a-90fb-043df81dea76.png align="center")
 
-The reason, as it turns out, are build hooks/scripts that trigger for the standard targets but not for the others. You can see what crate built for what target here: [https://github.com/pkgforge-cargo/builder/blob/main/data/CRATES\_BUILT.json](https://github.com/pkgforge-cargo/builder/blob/main/data/CRATES_BUILT.json)
+The reason, as it turns out again, are build hooks/scripts that trigger for the standard targets but not for the others. You can see what crate built for what target here: [https://github.com/pkgforge-cargo/builder/blob/main/data/CRATES\_BUILT.json](https://github.com/pkgforge-cargo/builder/blob/main/data/CRATES_BUILT.json)
 
 ---
 
@@ -319,10 +319,8 @@ sys     0m0.083s
 
 * **Distribution-focused**: Static executables for end users
     
-
 * **No development integration**: Not meant for `cargo` workflows
     
-
 * **Dependency-free**: Zero system library requirements
     
 * **Cross-distribution**: Works on any \*nix system (MUSL/GLIBC)
@@ -351,7 +349,11 @@ The [pkgforge-cargo](https://github.com/pkgforge-cargo/builder/) project will li
     
 * **Integration with Cargo**: Maybe something similar to what \`cargo binstall\` does.
     
-* **Build optimization**: Further reduce binary sizes and build times
+* **Build optimization**: Further reduce binary sizes and CI Build times
+    
+* **Contribute Upstream**: Implement a system to create an issue on the GitHub repo of the maintainer, with build log attached if the build fails. This would be opt-in.
+    
+* **Community Feedback**: Listen to our users & the community to improve this project & hope for a [widespread adoption beyond Soar](https://docs.pkgforge.dev/repositories/soarpkgs/re-distribution).
     
 
 As for us, @pkgforge team will try exploring other ecosystems & doing something similar.
