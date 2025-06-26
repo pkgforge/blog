@@ -372,7 +372,7 @@ The [pkgforge-cargo](https://github.com/pkgforge-cargo/builder/) project will li
     
 * **Integration with Cargo**: Maybe something similar to what \`cargo binstall\` does.
     
-* **Build optimization**: Further reduce binary sizes and CI Build times
+* **Build optimization**: Optimize CI Build times & reduce Failures
     
 * **Contribute Upstream**: Opt-in system to automatically create GitHub issues with build logs when crate compilation fails, helping maintainers improve cross-compilation compatibility
     
