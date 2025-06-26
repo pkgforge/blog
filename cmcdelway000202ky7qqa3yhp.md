@@ -8,27 +8,32 @@ tags: linux, automation, cli, rust, scale, programming-languages, cargo, package
 
 ---
 
-[**Pkgforge**](https://docs.pkgforge.dev/) has the [world's largest collection](https://docs.pkgforge.dev/soar/readme/packages#total) of [prebuilt](https://github.com/orgs/pkgforge/packages), [static binaries](https://docs.pkgforge.dev/repositories/bincache) that work everywhere without dependencies. Our [main repos](https://docs.pkgforge.dev/repositories) include hand-picked packages and manually maintained by us, but we had a crazy idea: what if we grabbed CLI tools from places like Rust's [crates.io](http://crates.io), built them as static binaries, and made them [available to everyone](https://github.com/pkgforge/soar)?
+<div data-node-type="callout">
+<div data-node-type="callout-emoji">🤖</div>
+<div data-node-type="callout-text">AI translation tools were used to assist with language clarity, as our research team are not native English speakers. We believe the quality of our research and findings will speak for themselves</div>
+</div>
 
-Basically, instead of manually adding every package, we'd tap into existing package ecosystems and automate the whole thing. It took us two weeks and a lot of trial & error to make this feasible.
+[**Pkgforge**](https://docs.pkgforge.dev/) hosts the [world's largest collection](https://docs.pkgforge.dev/soar/readme/packages#total) of [prebuilt](https://github.com/orgs/pkgforge/packages), [static binaries](https://docs.pkgforge.dev/repositories/bincache) that work everywhere without dependencies. While our [main repos](https://docs.pkgforge.dev/repositories) include hand-picked packages and manually maintained by our team, we had an ambitious idea: what if we could automatically harvest CLI tools from ecosystems like Rust's [crates.io](http://crates.io), build them as static binaries, and made them [available to everyone](https://github.com/pkgforge/soar)?
+
+Instead of manually curating every package, we decided to tap into existing package ecosystems and automate the entire process. After two weeks of intensive development and countless iterations, we made this idea a reality.
 
 ---
 
 # Ingesting Crates.io
 
-Crates.io provides [api access](https://crates.io/api/openapi.json) for both per crate lookup or bulk lookup. Initially, our script iterated through the first 1000 pages (Sorted by downloads) with 100 crates per page. This worked for a while & we ended up with ~111,000 crates. But then we ran into a problem that we needed to query each of these crates individually again to determine if they were of category [`command-line-utilities`](https://crates.io/categories/command-line-utilities), or produced executables, i.e. contain [`[[bin]]`](https://doc.rust-lang.org/cargo/reference/cargo-targets.html#binaries) in their manifest. This was simply not practical as we started to run into rate limits & potentially also violated the [Usage Policy](https://crates.io/policies).
+Crates.io provides [api access](https://crates.io/api/openapi.json) for individual crate lookups and bulk operations. Initially, our script iterated through the first 1,000 pages (sorted by downloads) with 100 crates per page, yielding approximately 111,000 crates. However, we soon encountered a significant bottleneck: we needed to query each crate individually to determine if it belonged to the [`command-line-utilities`](https://crates.io/categories/command-line-utilities), or produced executables, i.e. contained [`[[bin]]`](https://doc.rust-lang.org/cargo/reference/cargo-targets.html#binaries) in their manifest.
 
-Fortunately, [RFC-3463](https://rust-lang.github.io/rfcs/3463-crates-io-policy-update.html#data-access) came to our rescue, as crates.io provides periodic database dumps at https://static.crates.io/db-dump.tar.gz . We quickly drafted a [nifty cli](https://github.com/pkgforge-cargo/builder/tree/main/tools/crates-dumper) using [dtolnay/db-dump](https://github.com/dtolnay/db-dump)
+This approach proved impractical as we quickly hit rate limits and potentially violated the [Usage Policy](https://crates.io/policies). Fortunately, [RFC-3463](https://rust-lang.github.io/rfcs/3463-crates-io-policy-update.html#data-access) came to our rescue. Crates.io provides periodic database dumps at https://static.crates.io/db-dump.tar.gz . We quickly drafted a [nifty cli](https://github.com/pkgforge-cargo/builder/tree/main/tools/crates-dumper) using [dtolnay/db-dump](https://github.com/dtolnay/db-dump)
 
 ![](https://cdn.hashnode.com/res/hashnode/image/upload/v1750926527477/6e5f5128-9e35-45a4-b457-072389900a0c.gif align="center")
 
-Then it was just a matter of parsing this with a bit of jq, & automating it via GitHub Actions. Our [workflow](https://github.com/pkgforge-cargo/builder/actions/workflows/gen_data.yaml) now generated [all the data](https://github.com/pkgforge-cargo/builder/tree/main/data) we will need, automatically.
+Then it was just a matter of parsing this with a bit of jq, & automating it via GitHub Actions. Our [workflow](https://github.com/pkgforge-cargo/builder/actions/workflows/gen_data.yaml) now generates [all the data](https://github.com/pkgforge-cargo/builder/tree/main/data) we will need, automatically.
 
 ---
 
 # Crate Selection
 
-Since we ended up with over 111,000 crates, we needed to set some constraints & filter only what we actually want to build:
+Since we ended up with over 111,000 crates, we needed to set some constraints & filter for what we actually wanted to build:
 
 1. Should either be of category [command-line-utilities](https://crates.io/categories/command-line-utilities): `categories = ["command-line-utilities"]`
     
@@ -61,7 +66,7 @@ We ended up with ~ 10,000 crates that we now planned to compile.
 
 # Build Constraints
 
-Since we wanted truly portable, optimized & statically linked binaries, we applied the following build constraints:
+To achieve truly portable, optimized, and statically linked binaries, we applied the following comprehensive build constraints:
 
 ```bash
 #RUSTFLAGS
@@ -92,7 +97,7 @@ Since we wanted truly portable, optimized & statically linked binaries, we appli
     
 6. [**Stripped**](https://doc.rust-lang.org/cargo/reference/profiles.html#strip): `-C debuginfo=none -C strip=symbols`
     
-7. **No System Libraries**: Crates depending on system libraries will simply fail, as we primarily want pure rust crates.
+7. **No System Libraries**: Crates with system library dependencies will fail by design, as we target pure Rust implementations
     
     > ```bash
     > #These crates would error out in the following manner
@@ -106,9 +111,9 @@ Since we wanted truly portable, optimized & statically linked binaries, we appli
 
 # Build Tool
 
-Since we had over 10,000 crates that would be run as one crate per one GitHub actions runner, we wanted it to finish as quickly as possible. Cargo has [cross compilation features](https://rust-lang.github.io/rustup/cross-compilation.html), but it requires setup. So we were looking for something that just worked out of the box.
+With over 10,000 crates to build on individual GitHub Actions runners, speed was paramount. While Cargo offers [cross compilation features](https://rust-lang.github.io/rustup/cross-compilation.html), it requires significant setup overhead. We needed a solution that worked out of the box.
 
-We also couldn’t use our [heavy docker images](https://github.com/pkgforge/devscripts/pkgs/container/devscripts%2Falpine-builder) that we use for our [official packages](https://github.com/search?q=repo%3Apkgforge%2Fsoarpkgs%20docker%20run&type=code), because pulling/extracting them alone consumed ~2-3 mins of CI. This left us with [rust-cross/cargo-zigbuild](https://github.com/rust-cross/cargo-zigbuild) & [cross-rs/cross](https://github.com/cross-rs/cross). After some local testing, we decided to use **Cross** as it supported all the targets we needed & worked as advertised: *“Zero setup” cross compilation*
+Our [heavy docker images](https://github.com/pkgforge/devscripts/pkgs/container/devscripts%2Falpine-builder) used for [official packages](https://github.com/search?q=repo%3Apkgforge%2Fsoarpkgs%20docker%20run&type=code) consumed 2-3 minutes just for pulling and extraction, making them unsuitable for this scale. This left us with [rust-cross/cargo-zigbuild](https://github.com/rust-cross/cargo-zigbuild) & [cross-rs/cross](https://github.com/cross-rs/cross). After some local testing, we decided to use **Cross** as it supported all the targets we needed & worked as advertised: *“Zero setup” cross compilation*
 
 We also used [jpeddicord/askalono](https://github.com/jpeddicord/askalono) to automatically detect & copy over licenses.
 
@@ -126,7 +131,7 @@ cross +nightly build --target "${RUST_TARGET}" -Z unstable-options \
 
 # Build Targets
 
-While [**Soar**](https://github.com/pkgforge/soar) does run on any ***\*Unix-based Distro***, due to [lack of CI support for other Unix Kernel on GitHub Runners](https://github.com/actions/runner/issues/385) (natively, not VMs), we are limited to **Linux** only. We decided to cut the target matrix down further by skipping architectures that are reaching EOL, we ended up with:
+While [**Soar**](https://github.com/pkgforge/soar) supports any ***\*Unix-based Distro***, due to [lack of CI support for other Unix Kernel on GitHub Runners](https://github.com/actions/runner/issues/385) (natively, not VMs), we are limited to **Linux** only. We further refined our target matrix by excluding architectures approaching end-of-life:
 
 | **HOST\_TRIPLET** | **RUST\_TARGET** |
 | --- | --- |
@@ -143,7 +148,7 @@ We are aware of issues like [https://github.com/rust-lang/cargo/issues/13897](ht
 
 * Crates are downloaded from [crates.io](https://crates.io/policies/security), like the official [Cargo](https://github.com/rust-lang/cargo) does.
     
-* CI/CD run on [GitHub Actions](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions), with temporary/ephemeral tokens created & scoped to per package.
+* CI/CD run on [GitHub Actions](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions), with temporary, scoped tokens per package
     
 * Build Logs are viewable using: `soar log ${PKG_NAME}`
     
@@ -154,13 +159,13 @@ We are aware of issues like [https://github.com/rust-lang/cargo/issues/13897](ht
 * Checksums are generated (& verified at install time by Soar) for each & every artifact per build.
     
 
-The above measures ensured that even if a malicious crate decided to go rogue, it would not impact the integrity of any other crates & be limited to only itself.
+These measures ensure that even if a malicious crate attempts to compromise the system, its impact is isolated and cannot affect other crates' integrity.
 
 ---
 
 # Build Workflow
 
-10,000 multiplied by 4 targets, meant we would need to run ~ 40,000 instances of CI & also handle [metadata](https://github.com/pkgforge-cargo/builder/tree/metadata), [sanity checks](https://github.com/pkgforge-cargo/builder/blob/main/.github/workflows/matrix_builds.yaml), [uploading to ghcr](https://github.com/orgs/pkgforge-cargo/packages?repo_name=builder), all at the same time. We also set up a discord webhook to send this data over to our [discord server](https://discord.gg/djJUs48Zbu) so we see it live, in real time.
+10,000 multiplied by 4 targets, meant we would need to run ~ 40,000 instances of CI & also handle [metadata](https://github.com/pkgforge-cargo/builder/tree/metadata), [sanity checks](https://github.com/pkgforge-cargo/builder/blob/main/.github/workflows/matrix_builds.yaml), [uploading to ghcr](https://github.com/orgs/pkgforge-cargo/packages?repo_name=builder), all at the same time. We also set up a discord webhook to stream real-time progress updates to our [discord server](https://discord.gg/djJUs48Zbu).
 
 ```mermaid
 graph TD
@@ -179,11 +184,11 @@ graph TD
 
 ---
 
-# Takeaways
+# Key Insights and Findings
 
-## Queued vs Built
+## Build Success vs. Failure
 
-As stated, we attempted to build ~ 10,000 crates with optimistic expectations. We did expect failures, but not as high as this:
+We approached this project with optimistic expectations but encountered a sobering reality. Out of approximately 10,000 crates queued for building:
 
 ```bash
 🏗️ Build Pipeline by Success Rate
@@ -196,9 +201,9 @@ As stated, we attempted to build ~ 10,000 crates with optimistic expectations. W
 
 So what went wrong? We sampled about 100 of these error logs & concluded:
 
-1. System library dependencies were responsible for the majority of the errors.
+1. **System Library Dependencies**: The majority of failures stemmed from crates requiring system libraries that weren't available in our static build environment
     
-2. Some crates have custom-build system i.e. build.rs which fail if specified dependencies are not met.
+2. **Custom Build Systems**: Many crates include [`build.rs`](https://doc.rust-lang.org/cargo/reference/build-scripts.html) files that fail when specified dependencies aren't met or when detecting system features during cross-compilation
     
     ```bash
     #These typically fail cross-compilation
@@ -209,7 +214,7 @@ So what went wrong? We sampled about 100 of these error logs & concluded:
     ```
     
 
-Despite years of Rust development, **system library dependencies remain the primary build failure cause**. This reinforces the value of targeting CLI tools that can be statically linked.
+Despite years of Rust ecosystem maturation, **system library dependencies remain the primary obstacle to universal static compilation**. This reinforces our strategy of targeting CLI tools that can be fully statically linked.
 
 ---
 
@@ -246,23 +251,21 @@ This 3.6:1 ratio reveals how rich the Rust CLI ecosystem actually is.
 ─────────────────────────────────────────────────────────────────────────────────
 ```
 
-The consistent success rates across architectures demonstrate Rust's excellent cross-platform story, though newer architectures like loongarch64 show slightly lower compatibility. Unfortunately, Architecture-specific code is still quite common, it seems numerous crates are written with x86\_64 assumptions.
+The consistent success rates across architectures demonstrate Rust's excellent cross-platform story, though newer architectures like loongarch64 show slightly lower compatibility rates. This suggests that architecture-specific code assumptions remain common in the ecosystem.
 
-For instance, if we try to list all executables (not crates) for `x86_64-Linux`, we only get 5,627. But total built crates are 5,779 so even if one crate produces one executable, we should at least see 5,779 executables.
+**An interesting anomaly**: Despite building 5,779 crates successfully, x86\_64-Linux only shows 5,627 executables. This discrepancy occurs because some crates successfully build for non-standard targets like `loongarch64-Linux` and `riscv64-Linux` but fail for standard architectures due to build hooks and scripts that trigger differently across targets.
 
 ![](https://cdn.hashnode.com/res/hashnode/image/upload/v1750942440242/8809f2bd-ea27-410c-8b4f-3edbbae332a2.gif align="center")
 
-What happened? Where did they go missing? Well it turns out, some crates actually build successfully for non-standard targets like `loongarch64-Linux` & `riscv64-Linux` but fail for the regular aarch64/x86\_64
-
 ![](https://cdn.hashnode.com/res/hashnode/image/upload/v1750943280327/83353900-4b76-464a-90fb-043df81dea76.png align="center")
 
-The reason, as it turns out again, are build hooks/scripts that trigger for the standard targets but not for the others. You can see what crate built for what target here: [https://github.com/pkgforge-cargo/builder/blob/main/data/CRATES\_BUILT.json](https://github.com/pkgforge-cargo/builder/blob/main/data/CRATES_BUILT.json)
+You can explore detailed per-target build results here: [CRATES\_BUILT.json](https://github.com/pkgforge-cargo/builder/blob/main/data/CRATES_BUILT.json)
 
 ---
 
-## CI Build Time
+## CI Performance Metrics
 
-[matrix\_builds.yaml](https://github.com/pkgforge-cargo/builder/actions/workflows/.github/workflows/matrix_builds.yaml) is the main builder, others are for metadata & misc. This will significantly go down as we will only build crates that received an update & as well as implement caching.
+Our primary build workflow ([matrix\_builds.yaml](https://github.com/pkgforge-cargo/builder/actions/workflows/matrix_builds.yaml)) [handles the bulk](https://github.com/pkgforge-cargo/builder/actions/workflows/matrix_builds.yaml) of compilation, with additional workflows managing metadata and miscellaneous tasks. As we implement incremental builds (only rebuilding updated crates) and caching strategies, these metrics will improve significantly.
 
 ![](https://cdn.hashnode.com/res/hashnode/image/upload/v1750941666650/9984d3d9-62a8-4022-9a92-949dafef6d74.png align="center")
 
@@ -274,11 +277,11 @@ Average build time was ~ 2 minutes.
 
 # [**Review**](https://github.com/pkgforge-cargo/builder/actions/workflows/.github/workflows/matrix_builds.yaml)
 
-## Quick Comparison
+## Compilation vs. Prebuilt Distribution
 
-Compiling will always be slower than fetching prebuilds, as to how slow, it depends upon the crates & number of dependencies that Cargo has to compile before building the actual crate. In this demo, we will try to install [fd-find](https://github.com/sharkdp/fd), though you may use a crate with much more dependencies in your own tests.
+Compilation will always be slower than fetching prebuilt binaries, but the degree varies significantly based on crate complexity and dependency count. For our demonstration, we'll use [fd-find](https://github.com/sharkdp/fd) as a r[epresen](https://github.com/sharkdp/fd)tative example, though your experience may vary with more dependency-heavy crates.
 
-We will also not measure the cpu, disk, memory & bandwidth used. Try it yourself and feel the difference.
+*Note: We're not measuring CPU, disk, memory, or bandwidth usage here—try it yourself to experience the full performance difference.*
 
 ### Cargo
 
@@ -294,7 +297,7 @@ sys     0m24.411s
 
 ### Cargo Binstall/Quick Install
 
-[Cargo Binstall](https://github.com/cargo-bins/cargo-binstall) also uses [prebuilts](https://github.com/cargo-bins/cargo-quickinstall/), but takes time to resolve the crate first: [https://github.com/cargo-bins/cargo-binstall/issues/1333](https://github.com/cargo-bins/cargo-binstall/issues/1333)
+[Cargo Binstall](https://github.com/cargo-bins/cargo-binstall) [leverages preb](https://github.com/cargo-bins/cargo-binstall)[uilt binaries](https://github.com/cargo-bins/cargo-quickinstall/), [](https://github.com/cargo-bins/cargo-quickinstall/)though it requires time for crate resolution: [related issue](https://github.com/cargo-bins/cargo-binstall/issues/1333)
 
 ![](https://cdn.hashnode.com/res/hashnode/image/upload/v1750938339595/6094bebb-70c5-43dd-9c35-dff74a3b6a80.gif align="center")
 
@@ -341,7 +344,27 @@ sys     0m0.090s
 
 ---
 
-# Future Directions
+# Conclusion
+
+This project represents more than just a build farm; it's a proof of concept & also a reality check for the whole ecosystem.
+
+## Key Discoveries and Implications
+
+**The Rust CLI ecosystem is remarkably rich and diverse.** Our 3.6:1 ratio of executables to crates reveals that the community is building comprehensive toolsuites rather than single-purpose utilities. This multiplier effect means that successfully building even a subset of available crates provides exponentially more value to end users.
+
+**Cross-compilation compatibility has room for improvement.** While Rust's cross-platform story is generally excellent, our 42.4% failure rate highlights that system library dependencies and architecture-specific assumptions remain significant obstacles. This suggests opportunities for the community to develop more portable alternatives to system library bindings.
+
+**Static linking is both powerful and challenging.** The ability to produce truly portable binaries that work across any Linux distribution without dependencies is transformative for CLI tool distribution. However, achieving this requires careful consideration of build flags, dependencies, and compilation strategies.
+
+## Broader Ecosystem Implications
+
+Our work demonstrates that automated, large-scale binary distribution is not only feasible but can provide significant value to the developer community. The time savings alone—from nearly a minute of compilation time to under two seconds of download time—represent a meaningful improvement in developer productivity.
+
+More importantly, this approach democratizes access to CLI tools. Users no longer need to have Rust installed, understand compilation flags, or debug dependency issues. They can simply install and use tools, lowering the barrier to entry for adopting Rust-based CLI utilities.
+
+---
+
+# Future Roadmap
 
 The [pkgforge-cargo](https://github.com/pkgforge-cargo/builder/) project will likely see these additions/improvements in the near future:
 
@@ -351,15 +374,24 @@ The [pkgforge-cargo](https://github.com/pkgforge-cargo/builder/) project will li
     
 * **Build optimization**: Further reduce binary sizes and CI Build times
     
-* **Contribute Upstream**: Implement a system to create an issue on the GitHub repo of the maintainer, with build log attached if the build fails. This would be opt-in.
+* **Contribute Upstream**: Opt-in system to automatically create GitHub issues with build logs when crate compilation fails, helping maintainers improve cross-compilation compatibility
     
 * **Community Feedback**: Listen to our users & the community to improve this project & hope for a [widespread adoption beyond Soar](https://docs.pkgforge.dev/repositories/soarpkgs/re-distribution).
     
 
-As for us, @pkgforge team will try exploring other ecosystems & doing something similar.
+As we continue to refine and expand this system, we're excited about its potential to influence how the broader software community thinks about binary distribution. The lessons learned here apply beyond Rust to any compiled language ecosystem, and we're eager to explore applications in Go, Zig, and other emerging systems languages. (Help us if you can)
+
+The ultimate goal is to create a world where installing and using CLI tools is as simple as possible, regardless of the underlying programming language or system dependencies. This project represents a significant step toward that vision, and we're committed to continued innovation in this space.
+
+We invite the community to engage with this work, contribute improvements, and help us build a more accessible and efficient software distribution ecosystem. Together, we can make powerful CLI tools available to everyone, everywhere, without the traditional barriers of compilation and dependency management.
+
+## Links:
+
+* **Soar**: [https://github.com/pkgforge/soar](https://github.com/pkgforge/soar)
+    
+* **Pkgforge-Cargo**: [https://github.com/pkgforge-cargo/builder](https://github.com/pkgforge-cargo/builder)
+    
+* **Pkgforge-Discord**: [https://discord.gg/djJUs48Zbu](https://discord.gg/djJUs48Zbu)
+    
 
 ---
-
-# Conclusion
-
-This project represents more than just a build farm; it's a proof of concept & also a reality check for the whole ecosystem. We would like to end this with these closing observations, thoughts & recommendations:
